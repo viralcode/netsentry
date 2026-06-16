@@ -1,0 +1,17 @@
+{
+  "name": "netsentry",
+  "version": "1.0.0",
+  "description": "IoT Network Monitor & Traffic Inspector — Discover devices and monitor their network requests in real-time",
+  "main": "server.js",
+  "scripts": {
+    "start": "sudo node server.js",
+    "dev": "sudo node --watch server.js"
+  },
+  "keywords": ["network", "iot", "monitor", "security", "traffic", "sniffer"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.21.0",
+    "ws": "^8.18.0"
+  }
+}
