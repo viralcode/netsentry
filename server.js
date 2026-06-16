@@ -12,6 +12,7 @@ const { scanNetwork, getNetworkInfo } = require('./lib/scanner');
 const { startCapture, startDNSMonitor, stopCaptureForIP, stopAllCaptures, getActiveCaptures } = require('./lib/capture');
 const { TrafficAnalyzer } = require('./lib/analyzer');
 const { DNSProxy } = require('./lib/dns-proxy');
+const vulnScanner = require('./lib/vuln-scanner');
 
 const app = express();
 const server = http.createServer(app);
@@ -423,6 +424,97 @@ app.get('/api/analyze-connections/:ip', async (req, res) => {
   connections.sort((a, b) => (riskOrder[a.risk] || 1) - (riskOrder[b.risk] || 1));
 
   res.json({ success: true, data: { connections, deviceIP: ip } });
+});
+
+// ============================
+// Vulnerability Scanner API
+// ============================
+
+/**
+ * POST /api/vuln-scan/:ip — Start a vulnerability scan
+ */
+app.post('/api/vuln-scan/:ip', async (req, res) => {
+  const ip = req.params.ip;
+  const networkInfo = await getNetworkInfo();
+
+  // Check if scan already running
+  const progress = vulnScanner.scanProgress.get(ip);
+  if (progress && progress.status === 'scanning') {
+    return res.json({ success: false, error: 'Scan already in progress' });
+  }
+
+  res.json({ success: true, message: `Scan started for ${ip}` });
+
+  // Run scan in background
+  vulnScanner.runScan(ip, networkInfo.iface, (progress) => {
+    // Broadcast progress via WebSocket
+    broadcast({
+      type: 'vuln-scan-progress',
+      ip,
+      phase: progress.phase,
+      percent: progress.percent
+    });
+  }).then(results => {
+    broadcast({
+      type: 'vuln-scan-complete',
+      ip,
+      results: {
+        securityScore: results.securityScore,
+        openPorts: results.openPorts.length,
+        vulnerabilities: results.vulnerabilities.length,
+        summary: results.summary
+      }
+    });
+  });
+});
+
+/**
+ * GET /api/vuln-scan/:ip/status — Get scan progress
+ */
+app.get('/api/vuln-scan/:ip/status', (req, res) => {
+  const progress = vulnScanner.scanProgress.get(req.params.ip);
+  res.json({ success: true, data: progress || { phase: 'Not started', percent: 0, status: 'idle' } });
+});
+
+/**
+ * GET /api/vuln-scan/:ip/results — Get scan results
+ */
+app.get('/api/vuln-scan/:ip/results', (req, res) => {
+  const results = vulnScanner.scanResults.get(req.params.ip);
+  if (!results) return res.json({ success: false, error: 'No scan results. Run a scan first.' });
+  res.json({ success: true, data: results });
+});
+
+/**
+ * POST /api/vuln-scan/network — Scan all discovered devices
+ */
+app.post('/api/vuln-scan/network', async (req, res) => {
+  const devices = lastScanResults || [];
+  if (devices.length === 0) return res.json({ success: false, error: 'No devices discovered. Run a network scan first.' });
+
+  const networkInfo = await getNetworkInfo();
+  res.json({ success: true, message: `Starting scan of ${devices.length} devices` });
+
+  // Scan devices sequentially to avoid network congestion
+  for (const device of devices) {
+    if (device.ip === networkInfo.ip) continue; // Skip self
+    try {
+      await vulnScanner.runScan(device.ip, networkInfo.iface, (progress) => {
+        broadcast({ type: 'vuln-scan-progress', ip: device.ip, phase: progress.phase, percent: progress.percent });
+      });
+      broadcast({ type: 'vuln-scan-complete', ip: device.ip, results: vulnScanner.scanResults.get(device.ip) });
+    } catch (e) {
+      console.error(`[VulnScan] Error scanning ${device.ip}:`, e.message);
+    }
+  }
+  broadcast({ type: 'vuln-scan-network-complete' });
+});
+
+/**
+ * GET /api/ids/alerts — Get IDS alerts
+ */
+app.get('/api/ids/alerts', (req, res) => {
+  res.json({ success: true, data: vulnScanner.idsAlerts.slice(-100) });
 });
 
 // ============================

@@ -134,6 +134,13 @@ function handleWSMessage(msg) {
       addDNSEntry(msg.data);
       if (msg.alerts && msg.alerts.length > 0) msg.alerts.forEach(a => addAlert(a));
       break;
+    case 'vuln-scan-progress':
+      updateVulnScanProgress(msg);
+      break;
+    case 'vuln-scan-complete':
+      if (selectedDevice && msg.ip === selectedDevice.ip) loadVulnResults(msg.ip);
+      showToast('Scan Complete', `Security scan finished for ${msg.ip}`);
+      break;
   }
 }
 
@@ -418,6 +425,13 @@ function switchInspectorTab(tabName) {
   }
   if (tabName === 'connections' && selectedDevice) {
     loadConnections(selectedDevice.ip);
+  }
+  if (tabName === 'security' && selectedDevice) {
+    // Load existing results if available
+    fetch(`/api/vuln-scan/${selectedDevice.ip}/results`)
+      .then(r => r.json())
+      .then(j => { if (j.success) renderVulnResults(document.getElementById('security-content'), j.data); })
+      .catch(() => {});
   }
 }
 
@@ -1212,6 +1226,155 @@ async function sendRequest() {
 
   btn.disabled = false;
   btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg> Send Request';
+}
+
+// ============================
+// Vulnerability Scanner UI
+// ============================
+
+async function startVulnScan() {
+  if (!selectedDevice) return showToast('Error', 'Select a device first', 'error');
+  const container = document.getElementById('security-content');
+  container.innerHTML = `
+    <div class="scan-progress">
+      <div class="scan-progress-header">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent-cyan)" stroke-width="2" class="scan-spinner"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        <span>Scanning ${esc(selectedDevice.ip)}...</span>
+      </div>
+      <div class="scan-progress-bar"><div class="scan-progress-fill" id="vuln-progress-fill" style="width:0%"></div></div>
+      <div class="scan-progress-phase" id="vuln-progress-phase">Initializing...</div>
+    </div>`;
+  try {
+    await fetch(`/api/vuln-scan/${selectedDevice.ip}`, { method: 'POST' });
+  } catch (e) {
+    container.innerHTML = `<div class="empty-state-mini">❌ ${esc(e.message)}</div>`;
+  }
+}
+
+function updateVulnScanProgress(msg) {
+  if (!selectedDevice || msg.ip !== selectedDevice.ip) return;
+  const fill = document.getElementById('vuln-progress-fill');
+  const phase = document.getElementById('vuln-progress-phase');
+  if (fill) fill.style.width = msg.percent + '%';
+  if (phase) phase.textContent = msg.phase;
+}
+
+async function loadVulnResults(ip) {
+  const container = document.getElementById('security-content');
+  try {
+    const res = await fetch(`/api/vuln-scan/${ip}/results`);
+    const json = await res.json();
+    if (json.success) renderVulnResults(container, json.data);
+    else container.innerHTML = '<div class="empty-state-mini">No scan results yet.</div>';
+  } catch (e) {
+    container.innerHTML = `<div class="empty-state-mini">Error: ${esc(e.message)}</div>`;
+  }
+}
+
+function renderVulnResults(container, data) {
+  const scoreColor = data.securityScore >= 80 ? 'var(--accent-green)' : data.securityScore >= 50 ? 'var(--accent-amber)' : 'var(--accent-red)';
+  const sevColors = { critical: '#ef4444', high: '#f97316', medium: '#eab308', low: '#3b82f6', info: '#6b7280' };
+
+  let html = `
+    <div class="vuln-header">
+      <div class="security-score">
+        <div class="score-circle" style="--score-color:${scoreColor};--score-pct:${data.securityScore}">
+          <span class="score-number">${data.securityScore}</span>
+          <span class="score-label">/ 100</span>
+        </div>
+        <div class="score-meta">
+          <div class="score-title">Security Score</div>
+          <div class="score-time">Scanned in ${(data.duration / 1000).toFixed(1)}s</div>
+          ${data.os ? `<div class="score-os">🖥️ ${esc(data.os.name)} (${data.os.accuracy}% confidence)</div>` : ''}
+        </div>
+      </div>
+      <div class="vuln-summary-badges">
+        ${data.summary.critical ? `<span class="vuln-sbadge critical">${data.summary.critical} Critical</span>` : ''}
+        ${data.summary.high ? `<span class="vuln-sbadge high">${data.summary.high} High</span>` : ''}
+        ${data.summary.medium ? `<span class="vuln-sbadge medium">${data.summary.medium} Medium</span>` : ''}
+        ${data.summary.low ? `<span class="vuln-sbadge low">${data.summary.low} Low</span>` : ''}
+        ${Object.values(data.summary).every(v => v === 0) ? '<span class="vuln-sbadge safe">✅ No Vulnerabilities Found</span>' : ''}
+      </div>
+      <button class="btn btn-rescan" onclick="startVulnScan()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.3"/></svg>
+        Re-scan
+      </button>
+    </div>`;
+
+  // Open Ports Map
+  html += `<div class="vuln-section"><div class="vuln-section-title">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+    Open Ports (${data.openPorts.length})</div>
+    <div class="port-grid">`;
+
+  if (data.openPorts.length === 0) {
+    html += '<div class="empty-state-mini">No open ports detected — device may be well-firewalled.</div>';
+  } else {
+    for (const p of data.openPorts) {
+      const isDangerous = [23, 21, 1080, 3128, 4444, 5555, 6667, 31337].includes(p.port);
+      html += `<div class="port-chip ${isDangerous ? 'dangerous' : 'normal'}">
+        <span class="port-num">${p.port}</span>
+        <span class="port-svc">${esc(p.service || '?')} ${esc(p.product || '')}</span>
+      </div>`;
+    }
+  }
+  html += '</div></div>';
+
+  // Vulnerabilities
+  html += `<div class="vuln-section"><div class="vuln-section-title">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    Vulnerabilities (${data.vulnerabilities.length})</div>`;
+
+  if (data.vulnerabilities.length === 0) {
+    html += '<div class="vuln-clean">✅ No known vulnerabilities detected. Device appears secure.</div>';
+  } else {
+    for (const v of data.vulnerabilities) {
+      html += `<div class="vuln-card ${v.severity}">
+        <div class="vuln-card-top">
+          <span class="vuln-severity ${v.severity}">${v.severity.toUpperCase()}</span>
+          <span class="vuln-name">${esc(v.name)}</span>
+          ${v.id.startsWith('CVE') ? `<a href="https://nvd.nist.gov/vuln/detail/${v.id}" target="_blank" class="vuln-cve-link">${v.id}</a>` : `<span class="vuln-id">${esc(v.id)}</span>`}
+        </div>
+        <div class="vuln-desc">${esc(v.description)}</div>
+        ${v.port ? `<div class="vuln-port">Port: ${v.port}</div>` : ''}
+        <div class="vuln-fix">💡 ${esc(v.remediation)}</div>
+      </div>`;
+    }
+  }
+  html += '</div>';
+
+  // TLS Certificates
+  if (data.tlsCerts.length > 0) {
+    html += `<div class="vuln-section"><div class="vuln-section-title">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      TLS Certificates</div>`;
+    for (const c of data.tlsCerts) {
+      const statusClass = c.expired ? 'critical' : c.selfSigned ? 'medium' : 'safe';
+      const statusText = c.expired ? '⚠️ EXPIRED' : c.selfSigned ? '⚠️ Self-Signed' : '✅ Valid';
+      html += `<div class="tls-card ${statusClass}">
+        <div class="tls-status">${statusText}</div>
+        <div class="tls-detail"><span>Port:</span> ${c.port}</div>
+        ${c.subject ? `<div class="tls-detail"><span>Subject:</span> ${esc(c.subject)}</div>` : ''}
+        ${c.issuer ? `<div class="tls-detail"><span>Issuer:</span> ${esc(c.issuer)}</div>` : ''}
+        ${c.notAfter ? `<div class="tls-detail"><span>Expires:</span> ${esc(c.notAfter)} (${c.daysUntilExpiry}d)</div>` : ''}
+      </div>`;
+    }
+    html += '</div>';
+  }
+
+  // Default Credentials
+  if (data.defaultCreds.length > 0) {
+    html += `<div class="vuln-section"><div class="vuln-section-title crit-title">🚨 DEFAULT CREDENTIALS FOUND</div>`;
+    for (const c of data.defaultCreds) {
+      html += `<div class="cred-card">
+        <span>Port ${c.port}:</span> <code>${esc(c.username)}:${esc(c.password)}</code>
+        <span class="cred-status">HTTP ${c.status}</span>
+      </div>`;
+    }
+    html += '</div>';
+  }
+
+  container.innerHTML = html;
 }
 
 // ============================

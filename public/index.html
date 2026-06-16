@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/style.css?v=6">
+  <link rel="stylesheet" href="/css/style.css?v=7">
 </head>
 <body>
   <div id="app">
@@ -177,6 +177,10 @@
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
               Connections
             </button>
+            <button class="inspector-tab" data-itab="security" onclick="switchInspectorTab('security')">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 7h-3V4c0-1.1-.9-2-2-2H9c-1.1 0-2 .9-2 2v3H4c-1.1 0-2 .9-2 2v11c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V9c0-1.1-.9-2-2-2zM9 4h6v3H9V4zm3 14c-2.2 0-4-1.8-4-4s1.8-4 4-4 4 1.8 4 4-1.8 4-4 4z"/></svg>
+              Security
+            </button>
             <button class="inspector-tab" data-itab="charts" onclick="switchInspectorTab('charts')">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg>
               Charts
@@ -218,6 +222,23 @@
           <div class="inspector-sub" id="isub-connections">
             <div id="connections-content">
               <div class="empty-state-mini">Loading connection intelligence...</div>
+            </div>
+          </div>
+
+          <!-- Security Scan Sub-Panel -->
+          <div class="inspector-sub" id="isub-security">
+            <div id="security-content">
+              <div class="security-launch">
+                <div class="security-launch-icon">
+                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                </div>
+                <h3>Vulnerability Scanner</h3>
+                <p>Port scan, service detection, OS fingerprinting, CVE matching, default credential checking, UPnP discovery, and TLS analysis.</p>
+                <button class="btn btn-scan-launch" onclick="startVulnScan()">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                  Run Security Scan
+                </button>
+              </div>
             </div>
           </div>
 
@@ -295,6 +316,6 @@
     <div class="toast-container" id="toast-container"></div>
   </div>
 
-  <script src="/js/app.js?v=6"></script>
+  <script src="/js/app.js?v=7"></script>
 </body>
 </html>
