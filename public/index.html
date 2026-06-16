@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/style.css?v=5">
+  <link rel="stylesheet" href="/css/style.css?v=6">
 </head>
 <body>
   <div id="app">
@@ -173,6 +173,10 @@
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>
               Top Domains
             </button>
+            <button class="inspector-tab" data-itab="connections" onclick="switchInspectorTab('connections')">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
+              Connections
+            </button>
             <button class="inspector-tab" data-itab="charts" onclick="switchInspectorTab('charts')">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg>
               Charts
@@ -207,6 +211,13 @@
           <div class="inspector-sub" id="isub-top-domains">
             <div class="top-domains-list" id="top-domains-list">
               <div class="empty-state-mini">No DNS data yet. DNS proxy must be active.</div>
+            </div>
+          </div>
+
+          <!-- Connections Intelligence Sub-Panel -->
+          <div class="inspector-sub" id="isub-connections">
+            <div id="connections-content">
+              <div class="empty-state-mini">Loading connection intelligence...</div>
             </div>
           </div>
 
@@ -284,6 +295,6 @@
     <div class="toast-container" id="toast-container"></div>
   </div>
 
-  <script src="/js/app.js?v=5"></script>
+  <script src="/js/app.js?v=6"></script>
 </body>
 </html>

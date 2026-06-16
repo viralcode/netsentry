@@ -416,6 +416,81 @@ function switchInspectorTab(tabName) {
   if (tabName === 'charts') {
     setTimeout(() => { drawProtocolChart(); drawTrafficChart(); }, 50);
   }
+  if (tabName === 'connections' && selectedDevice) {
+    loadConnections(selectedDevice.ip);
+  }
+}
+
+async function loadConnections(ip) {
+  const container = document.getElementById('connections-content');
+  container.innerHTML = '<div class="conn-loading"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg> Analyzing connections & identifying providers...</div>';
+  try {
+    const res = await fetch(`/api/analyze-connections/${ip}`);
+    const json = await res.json();
+    if (json.success) renderConnections(container, json.data.connections);
+    else container.innerHTML = '<div class="empty-state-mini">Failed to analyze connections</div>';
+  } catch (e) {
+    container.innerHTML = `<div class="empty-state-mini">Error: ${esc(e.message)}</div>`;
+  }
+}
+
+function renderConnections(container, connections) {
+  if (!connections || connections.length === 0) {
+    container.innerHTML = '<div class="empty-state-mini">No DNS queries recorded yet. Wait for the device to make requests.</div>';
+    return;
+  }
+
+  const riskIcons = { safe: '✅', caution: '⚠️', suspicious: '🚨' };
+  const riskLabels = { safe: 'Known Provider', caution: 'Unknown Provider', suspicious: 'Suspicious' };
+
+  // Summary
+  const safe = connections.filter(c => c.risk === 'safe').length;
+  const caution = connections.filter(c => c.risk === 'caution').length;
+  const suspicious = connections.filter(c => c.risk === 'suspicious').length;
+
+  let html = `
+    <div class="conn-summary">
+      <div class="conn-summary-item safe"><span class="conn-count">${safe}</span><span class="conn-label">✅ Known</span></div>
+      <div class="conn-summary-item caution"><span class="conn-count">${caution}</span><span class="conn-label">⚠️ Unknown</span></div>
+      <div class="conn-summary-item suspicious"><span class="conn-count">${suspicious}</span><span class="conn-label">🚨 Suspicious</span></div>
+      <div class="conn-summary-item total"><span class="conn-count">${connections.length}</span><span class="conn-label">Total</span></div>
+    </div>
+    <div class="conn-grid">`;
+
+  for (const c of connections) {
+    html += `
+      <div class="conn-card ${c.risk}">
+        <div class="conn-card-header">
+          <span class="conn-risk-icon">${riskIcons[c.risk] || '❓'}</span>
+          <span class="conn-domain">${esc(c.domain)}</span>
+          <span class="conn-badge ${c.risk}">${riskLabels[c.risk]}</span>
+        </div>
+        <div class="conn-details">
+          <div class="conn-kv">
+            <span class="conn-key">IP</span>
+            <span class="conn-val">${c.resolvedIP || 'Unresolvable'}</span>
+          </div>
+          <div class="conn-kv">
+            <span class="conn-key">Provider</span>
+            <span class="conn-val">${esc(c.provider || '—')}</span>
+          </div>
+          ${c.country ? `<div class="conn-kv"><span class="conn-key">Country</span><span class="conn-val">${esc(c.country)}</span></div>` : ''}
+          ${c.as ? `<div class="conn-kv"><span class="conn-key">AS</span><span class="conn-val" style="font-size:0.65rem">${esc(c.as)}</span></div>` : ''}
+          <div class="conn-kv">
+            <span class="conn-key">Queries</span>
+            <span class="conn-val">${c.queryCount}×</span>
+          </div>
+        </div>
+        ${c.resolvedIP && !/^(10\.|172\.|192\.168\.|127\.)/.test(c.resolvedIP) ? `
+        <div class="conn-card-actions">
+          <a href="https://ipinfo.io/${c.resolvedIP}" target="_blank" rel="noopener" class="conn-link">IP Info</a>
+          <a href="https://www.abuseipdb.com/check/${c.resolvedIP}" target="_blank" rel="noopener" class="conn-link">Abuse DB</a>
+          <a href="https://www.shodan.io/host/${c.resolvedIP}" target="_blank" rel="noopener" class="conn-link">Shodan</a>
+        </div>` : ''}
+      </div>`;
+  }
+  html += '</div>';
+  container.innerHTML = html;
 }
 
 // ============================

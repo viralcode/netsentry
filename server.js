@@ -322,6 +322,109 @@ app.post('/api/request-builder', async (req, res) => {
   }
 });
 
+/**
+ * GET /api/analyze-connections/:ip
+ * Resolve all domains a device contacts and identify providers
+ */
+app.get('/api/analyze-connections/:ip', async (req, res) => {
+  const dns = require('dns').promises;
+  const ip = req.params.ip;
+  const deviceDns = deviceDNS.get(ip);
+  if (!deviceDns) return res.json({ success: true, data: { connections: [] } });
+
+  // Get unique domains
+  const domainMap = {};
+  for (const q of deviceDns.queries) {
+    if (!domainMap[q.domain]) domainMap[q.domain] = { count: 0, lastSeen: q.timestamp };
+    domainMap[q.domain].count++;
+    domainMap[q.domain].lastSeen = q.timestamp;
+  }
+
+  const domains = Object.keys(domainMap);
+  const connections = [];
+
+  // Resolve each domain to IP
+  for (const domain of domains.slice(0, 30)) { // Cap at 30
+    try {
+      const addresses = await dns.resolve4(domain).catch(() => []);
+      const resolvedIP = addresses[0] || null;
+      connections.push({
+        domain,
+        resolvedIP,
+        queryCount: domainMap[domain].count,
+        lastSeen: domainMap[domain].lastSeen
+      });
+    } catch (e) {
+      connections.push({ domain, resolvedIP: null, queryCount: domainMap[domain].count, lastSeen: domainMap[domain].lastSeen });
+    }
+  }
+
+  // Batch lookup IPs via ip-api.com (free, 45/min, batch up to 100)
+  const ipsToLookup = connections.filter(c => c.resolvedIP && !/^(10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.|127\.)/.test(c.resolvedIP)).map(c => c.resolvedIP);
+  const uniqueIPs = [...new Set(ipsToLookup)];
+
+  let ipInfo = {};
+  if (uniqueIPs.length > 0) {
+    try {
+      const http = require('http');
+      const body = JSON.stringify(uniqueIPs.map(ip => ({ query: ip, fields: 'query,country,isp,org,as,reverse' })));
+      const result = await new Promise((resolve, reject) => {
+        const req = http.request({
+          hostname: 'ip-api.com', port: 80, path: '/batch',
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          timeout: 5000
+        }, (res) => {
+          let data = '';
+          res.on('data', c => data += c);
+          res.on('end', () => { try { resolve(JSON.parse(data)); } catch(e) { resolve([]); } });
+        });
+        req.on('error', () => resolve([]));
+        req.on('timeout', () => { req.destroy(); resolve([]); });
+        req.write(body);
+        req.end();
+      });
+      for (const r of result) {
+        if (r.query) ipInfo[r.query] = { country: r.country, isp: r.isp, org: r.org, as: r.as, reverse: r.reverse };
+      }
+    } catch (e) { /* ip-api failed, continue without */ }
+  }
+
+  // Known safe providers
+  const safeProviders = ['google','amazon','aws','microsoft','azure','apple','cloudflare','akamai','fastly','meta','facebook','cloudfront','gcore'];
+
+  // Enrich connections
+  for (const conn of connections) {
+    if (conn.resolvedIP && ipInfo[conn.resolvedIP]) {
+      const info = ipInfo[conn.resolvedIP];
+      conn.provider = info.org || info.isp || 'Unknown';
+      conn.country = info.country || '';
+      conn.as = info.as || '';
+      conn.reverse = info.reverse || '';
+      // Risk assessment
+      const providerLower = (conn.provider + ' ' + (conn.as || '')).toLowerCase();
+      if (safeProviders.some(s => providerLower.includes(s))) {
+        conn.risk = 'safe';
+      } else if (conn.domain.includes('.') && !conn.domain.match(/\.(tk|ml|ga|cf|gq|duckdns|ddns|no-ip|dyndns)/i)) {
+        conn.risk = 'caution';
+      } else {
+        conn.risk = 'suspicious';
+      }
+    } else if (conn.resolvedIP) {
+      conn.provider = 'Private/Local';
+      conn.risk = 'safe';
+    } else {
+      conn.provider = 'Unresolvable';
+      conn.risk = 'caution';
+    }
+  }
+
+  // Sort: suspicious first, then caution, then safe
+  const riskOrder = { suspicious: 0, caution: 1, safe: 2 };
+  connections.sort((a, b) => (riskOrder[a.risk] || 1) - (riskOrder[b.risk] || 1));
+
+  res.json({ success: true, data: { connections, deviceIP: ip } });
+});
+
 // ============================
 // Helper: Get top domains for a device
 // ============================

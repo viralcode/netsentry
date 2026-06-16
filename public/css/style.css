@@ -850,6 +850,74 @@ td.device-ip { font-family: var(--font-mono); color: var(--accent-cyan); }
 }
 .req-builder-actions .btn-primary { flex: 1; justify-content: center; }
 
+/* Connection Intelligence */
+.conn-loading {
+  display: flex; align-items: center; gap: 8px; padding: 20px;
+  color: var(--text-tertiary); font-size: 0.8rem;
+}
+.conn-loading svg { animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.conn-summary {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
+  padding: 16px; border-bottom: 1px solid var(--border-subtle);
+}
+.conn-summary-item {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: 10px 8px; border-radius: var(--radius-md);
+  background: var(--bg-tertiary); border: 1px solid var(--border-subtle);
+}
+.conn-summary-item.safe { border-color: rgba(34,197,94,0.3); }
+.conn-summary-item.caution { border-color: rgba(251,191,36,0.3); }
+.conn-summary-item.suspicious { border-color: rgba(239,68,68,0.3); }
+.conn-count { font-size: 1.4rem; font-weight: 700; color: var(--text-primary); }
+.conn-label { font-size: 0.62rem; color: var(--text-tertiary); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+
+.conn-grid { display: flex; flex-direction: column; gap: 8px; padding: 16px; }
+
+.conn-card {
+  background: var(--bg-tertiary); border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md); overflow: hidden;
+  transition: border-color 0.2s, transform 0.15s;
+}
+.conn-card:hover { transform: translateY(-1px); }
+.conn-card.safe { border-left: 3px solid var(--accent-green); }
+.conn-card.caution { border-left: 3px solid var(--accent-amber); }
+.conn-card.suspicious { border-left: 3px solid var(--accent-red); }
+
+.conn-card-header {
+  display: flex; align-items: center; gap: 8px; padding: 10px 14px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.conn-risk-icon { font-size: 0.85rem; }
+.conn-domain {
+  flex: 1; font-family: var(--font-mono); font-size: 0.76rem;
+  color: var(--accent-cyan); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.conn-badge {
+  font-size: 0.55rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.5px; padding: 3px 8px; border-radius: 10px; white-space: nowrap;
+}
+.conn-badge.safe { background: rgba(34,197,94,0.15); color: var(--accent-green); }
+.conn-badge.caution { background: rgba(251,191,36,0.15); color: var(--accent-amber); }
+.conn-badge.suspicious { background: rgba(239,68,68,0.15); color: var(--accent-red); }
+
+.conn-details { padding: 10px 14px; display: flex; flex-wrap: wrap; gap: 6px 16px; }
+.conn-kv { display: flex; gap: 6px; align-items: baseline; }
+.conn-key { font-size: 0.6rem; color: var(--text-tertiary); font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px; }
+.conn-val { font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-secondary); }
+
+.conn-card-actions {
+  display: flex; gap: 6px; padding: 8px 14px;
+  border-top: 1px solid var(--border-subtle); background: rgba(0,0,0,0.15);
+}
+.conn-link {
+  font-size: 0.6rem; color: var(--accent-cyan); text-decoration: none;
+  padding: 3px 8px; border: 1px solid var(--border-subtle); border-radius: var(--radius-sm);
+  transition: all 0.2s;
+}
+.conn-link:hover { background: var(--bg-hover); border-color: var(--accent-cyan); }
+
 /* ---- Responsive ---- */
 @media (max-width: 1024px) {
   .header { flex-direction: column; gap: 12px; align-items: flex-start; }
