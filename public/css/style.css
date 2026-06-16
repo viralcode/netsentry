@@ -998,6 +998,11 @@ td.device-ip { font-family: var(--font-mono); color: var(--accent-cyan); }
   background: var(--bg-tertiary); border: 1px solid var(--border-subtle); min-width: 70px;
 }
 .port-chip.dangerous { border-color: rgba(239,68,68,0.5); background: rgba(239,68,68,0.08); }
+.port-chip.critical { border-color: rgba(239,68,68,0.5); background: rgba(239,68,68,0.08); }
+.port-chip.high { border-color: rgba(249,115,22,0.4); background: rgba(249,115,22,0.06); }
+.port-chip.medium { border-color: rgba(234,179,8,0.4); background: rgba(234,179,8,0.06); }
+.port-chip.iot { border-color: rgba(139,92,246,0.4); background: rgba(139,92,246,0.06); }
+.port-chip.safe { border-color: var(--border-subtle); }
 .port-num { font-family: var(--font-mono); font-size: 0.85rem; font-weight: 700; color: var(--accent-cyan); }
 .port-svc { font-size: 0.55rem; color: var(--text-tertiary); text-align: center; max-width: 80px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 

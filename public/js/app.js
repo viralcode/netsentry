@@ -1273,7 +1273,7 @@ async function loadVulnResults(ip) {
 
 function renderVulnResults(container, data) {
   const scoreColor = data.securityScore >= 80 ? 'var(--accent-green)' : data.securityScore >= 50 ? 'var(--accent-amber)' : 'var(--accent-red)';
-  const sevColors = { critical: '#ef4444', high: '#f97316', medium: '#eab308', low: '#3b82f6', info: '#6b7280' };
+  const sigStats = data.signatureStats || { total: 0, matched: 0 };
 
   let html = `
     <div class="vuln-header">
@@ -1284,7 +1284,7 @@ function renderVulnResults(container, data) {
         </div>
         <div class="score-meta">
           <div class="score-title">Security Score</div>
-          <div class="score-time">Scanned in ${(data.duration / 1000).toFixed(1)}s</div>
+          <div class="score-time">Scanned in ${(data.duration / 1000).toFixed(1)}s • ${sigStats.total} signatures checked</div>
           ${data.os ? `<div class="score-os">🖥️ ${esc(data.os.name)} (${data.os.accuracy}% confidence)</div>` : ''}
         </div>
       </div>
@@ -1311,8 +1311,8 @@ function renderVulnResults(container, data) {
     html += '<div class="empty-state-mini">No open ports detected — device may be well-firewalled.</div>';
   } else {
     for (const p of data.openPorts) {
-      const isDangerous = [23, 21, 1080, 3128, 4444, 5555, 6667, 31337].includes(p.port);
-      html += `<div class="port-chip ${isDangerous ? 'dangerous' : 'normal'}">
+      const riskClass = p.risk || 'safe';
+      html += `<div class="port-chip ${riskClass}">
         <span class="port-num">${p.port}</span>
         <span class="port-svc">${esc(p.service || '?')} ${esc(p.product || '')}</span>
       </div>`;
